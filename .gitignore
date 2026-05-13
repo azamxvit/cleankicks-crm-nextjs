@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# local Cursor rules (не в репозиторий)
+.cursorrules
+
 # debug
 npm-debug.log*
 yarn-debug.log*
