@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { ThemeModeToggle } from "@/components/widgets/ThemeModeToggle";
+import { Button } from "@/components/shared/button";
+import { useOrders } from "@/lib/crm/orders-context";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -14,6 +16,7 @@ const NAV = [
 
 export function AppShellLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { storageError, clearStorageError } = useOrders();
 
   return (
     <div className="flex min-h-full flex-col md:flex-row">
@@ -50,7 +53,24 @@ export function AppShellLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <div className="flex min-h-0 flex-1 flex-col">
-        <main id="main-content" className="flex-1 p-4 md:p-6">
+        <main id="main-content" className="flex-1 space-y-4 p-4 md:p-6">
+          {storageError ? (
+            <div
+              role="alert"
+              className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+            >
+              <span>{storageError}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 border-destructive/50"
+                onClick={clearStorageError}
+              >
+                Понятно
+              </Button>
+            </div>
+          ) : null}
           {children}
         </main>
       </div>

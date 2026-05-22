@@ -1,0 +1,15 @@
+export function getSupabaseUrl(): string {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
+}
+
+export function getSupabasePublishableOrAnonKey(): string {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    ""
+  );
+}
+
+export function getSupabaseServiceRoleKey(): string {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? "";
+}

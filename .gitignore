@@ -24,7 +24,7 @@
 .DS_Store
 *.pem
 
-# local Cursor rules (не в репозиторий)
+# local Cursor rules s
 .cursorrules
 
 # debug
@@ -35,6 +35,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.env.local
+.env.development
+.env.production
+.env.test
+
 
 # vercel
 .vercel

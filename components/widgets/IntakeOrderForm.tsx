@@ -23,11 +23,12 @@ function emptyShoe(): ShoeDraft {
 
 export function IntakeOrderForm() {
   const router = useRouter();
-  const { dispatch, hydrated } = useOrders();
+  const { dispatch, hydrated, useSupabaseOrders, createOrderRemote } = useOrders();
   const [clientName, setClientName] = React.useState("");
   const [clientPhone, setClientPhone] = React.useState("");
   const [items, setItems] = React.useState<ShoeDraft[]>([emptyShoe()]);
   const [error, setError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
 
   const addShoe = () => {
     if (items.length >= MAX_SHOES_PER_ORDER) {
@@ -36,7 +37,7 @@ export function IntakeOrderForm() {
     setItems((prev) => [...prev, emptyShoe()]);
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!clientName.trim() || !clientPhone.trim()) {
@@ -60,6 +61,26 @@ export function IntakeOrderForm() {
       setError("Добавьте хотя бы одно фото каждой пары — так проще выдать без путаницы.");
       return;
     }
+
+    if (useSupabaseOrders) {
+      setSubmitting(true);
+      const res = await createOrderRemote({
+        clientName: clientName.trim(),
+        clientPhone: clientPhone.trim(),
+        items: cleaned,
+      });
+      setSubmitting(false);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setClientName("");
+      setClientPhone("");
+      setItems([emptyShoe()]);
+      router.push("/orders");
+      return;
+    }
+
     dispatch({
       type: "CREATE_ORDER",
       payload: {
@@ -77,7 +98,7 @@ export function IntakeOrderForm() {
   if (!hydrated) {
     return (
       <p className="text-sm text-muted-foreground" role="status">
-        Загрузка локальных заказов…
+        {useSupabaseOrders ? "Загрузка заказов из Supabase…" : "Загрузка локальных заказов…"}
       </p>
     );
   }
@@ -154,8 +175,8 @@ export function IntakeOrderForm() {
       ) : null}
 
       <div className="flex justify-end border-t pt-4">
-        <Button type="submit" size="lg">
-          Создать заказ
+        <Button type="submit" size="lg" disabled={submitting}>
+          {submitting ? "Сохранение…" : "Создать заказ"}
         </Button>
       </div>
     </form>

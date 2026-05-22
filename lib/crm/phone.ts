@@ -1,4 +1,3 @@
-/** Digits-only phone for search and storage comparison. */
 export function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }

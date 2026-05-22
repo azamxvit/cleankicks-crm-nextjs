@@ -1,3 +1,4 @@
+import { createLocalId } from "@/lib/crm/create-id";
 import { ORDERS_STORAGE_KEY } from "@/lib/crm/constants";
 import { normalizePhone } from "@/lib/crm/phone";
 import type { CreateOrderInput, Order, OrderStatus } from "@/lib/crm/types";
@@ -28,13 +29,13 @@ export function ordersReducer(state: OrdersState, action: OrdersAction): OrdersS
     case "CREATE_ORDER": {
       const now = new Date().toISOString();
       const order: Order = {
-        id: crypto.randomUUID(),
+        id: createLocalId(),
         ticketCode: ticketCode(state.orders),
         clientName: action.payload.clientName.trim(),
         clientPhone: normalizePhone(action.payload.clientPhone),
         status: "received",
         items: action.payload.items.map((item) => ({
-          id: crypto.randomUUID(),
+          id: createLocalId(),
           brand: item.brand.trim(),
           model: item.model.trim(),
           color: item.color.trim(),
@@ -78,9 +79,34 @@ export function loadOrdersFromStorage(): Order[] | null {
   }
 }
 
-export function saveOrdersToStorage(orders: Order[]) {
+export type SaveOrdersResult =
+  | { ok: true }
+  | { ok: false; code: "quota" | "unknown"; message: string };
+
+export function saveOrdersToStorage(orders: Order[]): SaveOrdersResult {
   if (typeof window === "undefined") {
-    return;
+    return { ok: true };
   }
-  localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
+  try {
+    const raw = JSON.stringify(orders);
+    localStorage.setItem(ORDERS_STORAGE_KEY, raw);
+    return { ok: true };
+  } catch (e) {
+    const isQuota =
+      e instanceof DOMException &&
+      (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014);
+    if (isQuota) {
+      return {
+        ok: false,
+        code: "quota",
+        message:
+          "Браузер не смог сохранить заказ: слишком много данных (часто из‑за фото). Уменьшите число снимков или удалите старые заказы.",
+      };
+    }
+    return {
+      ok: false,
+      code: "unknown",
+      message: "Не удалось сохранить заказы в памяти браузера.",
+    };
+  }
 }

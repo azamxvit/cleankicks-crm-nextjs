@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
+import NextImage from "next/image";
 
 import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
 import { Label } from "@/components/shared/label";
 import { Textarea } from "@/components/shared/textarea";
+import { compressImageFileToJpegDataUrl } from "@/lib/crm/compress-image";
 import { MAX_PHOTOS_PER_SHOE } from "@/lib/crm/constants";
 import type { ShoeLine } from "@/lib/crm/types";
 
@@ -19,26 +21,36 @@ type Props = {
   canRemove: boolean;
 };
 
-function readFilesAsDataUrls(files: FileList | null): Promise<string[]> {
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function readPhotosAsDataUrls(files: FileList | null): Promise<string[]> {
   if (!files?.length) {
-    return Promise.resolve([]);
+    return [];
   }
   const list = Array.from(files).slice(0, MAX_PHOTOS_PER_SHOE);
-  return Promise.all(
-    list.map(
-      (file) =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(file);
-        })
-    )
-  );
+  const urls: string[] = [];
+  for (const file of list) {
+    try {
+      urls.push(await compressImageFileToJpegDataUrl(file));
+    } catch {
+      try {
+        urls.push(await readFileAsDataUrl(file));
+      } catch {}
+    }
+  }
+  return urls;
 }
 
 export function ShoeLineFields({ index, value, onChange, onRemove, canRemove }: Props) {
   const inputId = `shoe-photos-${index}`;
+  const [photoError, setPhotoError] = React.useState<string | null>(null);
 
   return (
     <fieldset className="space-y-3 rounded-xl border bg-muted/30 p-4">
@@ -94,19 +106,34 @@ export function ShoeLineFields({ index, value, onChange, onRemove, canRemove }: 
           multiple
           className="cursor-pointer"
           onChange={async (e) => {
-            const urls = await readFilesAsDataUrls(e.target.files);
-            onChange({ ...value, photoUrls: urls });
+            setPhotoError(null);
+            try {
+              const urls = await readPhotosAsDataUrls(e.target.files);
+              if (!urls.length && e.target.files?.length) {
+                setPhotoError("Не удалось обработать снимки. Попробуйте JPEG/PNG или другое фото.");
+              }
+              onChange({ ...value, photoUrls: urls });
+            } catch {
+              setPhotoError("Ошибка при чтении файлов.");
+            }
             e.target.value = "";
           }}
         />
+        {photoError ? (
+          <p className="text-xs text-destructive" role="alert">
+            {photoError}
+          </p>
+        ) : null}
         {value.photoUrls.length > 0 ? (
           <ul className="flex flex-wrap gap-2" aria-label={`Превью фото пары ${index + 1}`}>
             {value.photoUrls.map((src, i) => (
               <li key={`${src.slice(0, 40)}-${i}`} className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element -- data URLs from intake */}
-                <img
+                <NextImage
                   src={src}
                   alt={`Фото пары ${index + 1}, кадр ${i + 1}`}
+                  width={80}
+                  height={80}
+                  unoptimized
                   className="size-20 rounded-lg border object-cover"
                 />
                 <Button

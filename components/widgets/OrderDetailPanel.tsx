@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import NextImage from "next/image";
+import * as React from "react";
 
 import { OrderStatusBadge } from "@/components/widgets/OrderStatusBadge";
 import { Button } from "@/components/shared/button";
@@ -22,8 +24,9 @@ type Props = {
 };
 
 export function OrderDetailPanel({ orderId }: Props) {
-  const { getOrder, dispatch, hydrated } = useOrders();
+  const { getOrder, dispatch, hydrated, useSupabaseOrders, updateStatusRemote } = useOrders();
   const order = getOrder(orderId);
+  const [statusError, setStatusError] = React.useState<string | null>(null);
 
   if (!hydrated) {
     return <p className="text-sm text-muted-foreground">Загрузка…</p>;
@@ -84,8 +87,16 @@ export function OrderDetailPanel({ orderId }: Props) {
               aria-label="Статус заказа"
               className="h-10 min-w-48 rounded-lg border border-input bg-transparent px-3 text-base focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               value={order.status}
-              onChange={(e) => {
+              onChange={async (e) => {
+                setStatusError(null);
                 const next = e.target.value as OrderStatus;
+                if (useSupabaseOrders) {
+                  const r = await updateStatusRemote(order.id, next);
+                  if (!r.ok) {
+                    setStatusError(r.error);
+                  }
+                  return;
+                }
                 dispatch({ type: "SET_STATUS", orderId: order.id, status: next });
               }}
             >
@@ -96,6 +107,11 @@ export function OrderDetailPanel({ orderId }: Props) {
               ))}
             </select>
           </div>
+          {statusError ? (
+            <p className="w-full text-sm text-destructive" role="alert">
+              {statusError}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -126,10 +142,12 @@ export function OrderDetailPanel({ orderId }: Props) {
                     <ul className="flex flex-wrap gap-2" aria-label={`Фото пары ${idx + 1}`}>
                       {item.photoUrls.map((src, i) => (
                         <li key={`${item.id}-ph-${i}`}>
-                          {/* eslint-disable-next-line @next/next/no-img-element -- data URLs from local intake */}
-                          <img
+                          <NextImage
                             src={src}
                             alt={`${item.brand} ${item.model}, фото ${i + 1}`}
+                            width={128}
+                            height={128}
+                            unoptimized
                             className="h-32 w-32 rounded-lg border object-cover"
                           />
                         </li>
