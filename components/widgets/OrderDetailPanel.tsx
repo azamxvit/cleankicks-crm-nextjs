@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import NextImage from "next/image";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { OrderStatusBadge } from "@/components/widgets/OrderStatusBadge";
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export function OrderDetailPanel({ orderId }: Props) {
+  const router = useRouter();
   const { getOrder, dispatch, hydrated, useSupabaseOrders, updateStatusRemote } = useOrders();
   const order = getOrder(orderId);
   const [statusError, setStatusError] = React.useState<string | null>(null);
@@ -94,10 +96,17 @@ export function OrderDetailPanel({ orderId }: Props) {
                   const r = await updateStatusRemote(order.id, next);
                   if (!r.ok) {
                     setStatusError(r.error);
+                    return;
+                  }
+                  if (next === "completed") {
+                    router.push("/orders");
                   }
                   return;
                 }
                 dispatch({ type: "SET_STATUS", orderId: order.id, status: next });
+                if (next === "completed") {
+                  router.push("/orders");
+                }
               }}
             >
               {ORDER_STATUS_FLOW.map((s) => (

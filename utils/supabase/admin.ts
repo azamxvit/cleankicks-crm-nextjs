@@ -8,7 +8,7 @@ export function createAdminClient(): SupabaseClient {
   const url = getSupabaseUrl();
   const key = getSupabaseServiceRoleKey();
   if (!url || !key) {
-    throw new Error("Supabase не настроен.");
+    throw new Error("Supabase не настроен: NEXT_PUBLIC_SUPABASE_URL и SUPABASE_SERVICE_ROLE_KEY.");
   }
   return createClient(url, key, {
     auth: {

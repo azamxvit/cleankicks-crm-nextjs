@@ -14,8 +14,13 @@ import {
 } from "@/components/shared/card";
 import { Input } from "@/components/shared/input";
 import { Label } from "@/components/shared/label";
+import { PhoneInput } from "@/components/shared/phone-input";
 import { MAX_SHOES_PER_ORDER } from "@/lib/crm/constants";
 import { useOrders } from "@/lib/crm/orders-context";
+import { dataUrlByteSize } from "@/lib/crm/compress-image";
+import { isValidKzPhone, normalizePhone } from "@/lib/crm/phone";
+
+const MAX_ORDER_PHOTOS_BYTES = 3.5 * 1024 * 1024;
 
 function emptyShoe(): ShoeDraft {
   return { brand: "", model: "", color: "", notes: "", photoUrls: [] };
@@ -44,6 +49,11 @@ export function IntakeOrderForm() {
       setError("Укажите имя и телефон клиента.");
       return;
     }
+    if (!isValidKzPhone(clientPhone)) {
+      setError("Укажите полный номер в формате 777-123-45-67.");
+      return;
+    }
+    const phoneDigits = normalizePhone(clientPhone);
     const cleaned = items.map((s) => ({
       ...s,
       brand: s.brand.trim(),
@@ -61,12 +71,20 @@ export function IntakeOrderForm() {
       setError("Добавьте хотя бы одно фото каждой пары — так проще выдать без путаницы.");
       return;
     }
+    const photoBytes = cleaned.reduce(
+      (sum, item) => sum + item.photoUrls.reduce((s, url) => s + dataUrlByteSize(url), 0),
+      0
+    );
+    if (photoBytes > MAX_ORDER_PHOTOS_BYTES) {
+      setError("Слишком много фото в заказе. Уменьшите число пар или снимков.");
+      return;
+    }
 
     if (useSupabaseOrders) {
       setSubmitting(true);
       const res = await createOrderRemote({
         clientName: clientName.trim(),
-        clientPhone: clientPhone.trim(),
+        clientPhone: phoneDigits,
         items: cleaned,
       });
       setSubmitting(false);
@@ -85,7 +103,7 @@ export function IntakeOrderForm() {
       type: "CREATE_ORDER",
       payload: {
         clientName: clientName.trim(),
-        clientPhone: clientPhone.trim(),
+        clientPhone: phoneDigits,
         items: cleaned,
       },
     });
@@ -98,7 +116,7 @@ export function IntakeOrderForm() {
   if (!hydrated) {
     return (
       <p className="text-sm text-muted-foreground" role="status">
-        {useSupabaseOrders ? "Загрузка заказов из Supabase…" : "Загрузка локальных заказов…"}
+        Загрузка…
       </p>
     );
   }
@@ -123,14 +141,11 @@ export function IntakeOrderForm() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="client-phone">Телефон</Label>
-            <Input
+            <PhoneInput
               id="client-phone"
-              type="tel"
-              inputMode="tel"
               value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
-              autoComplete="tel"
-              placeholder="+7 900 000-00-00"
+              onValueChange={setClientPhone}
+              aria-invalid={clientPhone.length > 0 && !isValidKzPhone(clientPhone)}
             />
           </div>
         </CardContent>

@@ -48,6 +48,9 @@ export function ordersReducer(state: OrdersState, action: OrdersAction): OrdersS
       return { orders: [order, ...state.orders] };
     }
     case "SET_STATUS": {
+      if (action.status === "completed") {
+        return { orders: state.orders.filter((o) => o.id !== action.orderId) };
+      }
       const now = new Date().toISOString();
       return {
         orders: state.orders.map((o) =>

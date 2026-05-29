@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { createLocalId } from "@/lib/crm/create-id";
 import { MAX_PHOTOS_PER_SHOE, MAX_SHOES_PER_ORDER, ORDER_PHOTOS_BUCKET } from "@/lib/crm/constants";
 import { mapDbOrderToOrder, type DbOrderRow } from "@/lib/crm/map-db-order";
+import { deleteOrderPhotosFromStorage } from "@/lib/crm/order-storage";
 import { normalizePhone } from "@/lib/crm/phone";
 import type { CreateOrderInput, Order, OrderStatus } from "@/lib/crm/types";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -63,16 +64,16 @@ async function uploadPhotoDataUrls(
       return { ok: false, error: `Некорректный формат фото #${i + 1}` };
     }
     const body = Buffer.from(parsed.base64, "base64");
-    const path = `${orderId}/${itemId}/${i}.jpg`;
+    const isPng = parsed.mime === "image/png";
+    const ext = isPng ? "png" : "jpg";
+    const contentType = isPng ? "image/png" : "image/jpeg";
+    const path = `${orderId}/${itemId}/${i}.${ext}`;
     const { error } = await supabase.storage.from(ORDER_PHOTOS_BUCKET).upload(path, body, {
-      contentType: "image/jpeg",
+      contentType,
       upsert: true,
     });
     if (error) {
-      return {
-        ok: false,
-        error: `Не удалось загрузить фото (${error.message}).`,
-      };
+      return { ok: false, error: `Не удалось загрузить фото (${error.message}).` };
     }
     const { data: pub } = supabase.storage.from(ORDER_PHOTOS_BUCKET).getPublicUrl(path);
     urls.push(pub.publicUrl);
@@ -185,6 +186,8 @@ export async function createOrderAction(
         }
       }
     } catch (e) {
+      await deleteOrderPhotosFromStorage(orderId);
+      await supabase.from("order_items").delete().eq("order_id", orderId);
       await supabase.from("orders").delete().eq("id", orderId);
       const msg = e instanceof Error ? e.message : "Ошибка при сохранении пар.";
       return { ok: false, error: msg };
@@ -209,11 +212,32 @@ export async function updateOrderStatusAction(
 ): Promise<{ ok: true; orders: Order[] } | { ok: false; error: string }> {
   try {
     const supabase = createAdminClient();
-    const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
-    if (error) {
-      return { ok: false, error: error.message };
+
+    if (status === "completed") {
+      const removed = await deleteOrderPhotosFromStorage(orderId);
+      if (!removed.ok) {
+        return { ok: false, error: `Не удалось удалить фото: ${removed.error}` };
+      }
+      const { error: itemsErr } = await supabase
+        .from("order_items")
+        .delete()
+        .eq("order_id", orderId);
+      if (itemsErr) {
+        return { ok: false, error: itemsErr.message };
+      }
+      const { error: orderErr } = await supabase.from("orders").delete().eq("id", orderId);
+      if (orderErr) {
+        return { ok: false, error: orderErr.message };
+      }
+    } else {
+      const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
+      if (error) {
+        return { ok: false, error: error.message };
+      }
     }
+
     revalidatePath("/orders");
+    revalidatePath("/pickup");
     revalidatePath(`/orders/${orderId}`);
     const refreshed = await fetchOrdersAction();
     if (!refreshed.ok) {

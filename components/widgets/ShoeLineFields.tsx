@@ -7,7 +7,7 @@ import { Button } from "@/components/shared/button";
 import { Input } from "@/components/shared/input";
 import { Label } from "@/components/shared/label";
 import { Textarea } from "@/components/shared/textarea";
-import { compressImageFileToJpegDataUrl } from "@/lib/crm/compress-image";
+import { compressImageFile } from "@/lib/crm/compress-image";
 import { MAX_PHOTOS_PER_SHOE } from "@/lib/crm/constants";
 import type { ShoeLine } from "@/lib/crm/types";
 
@@ -21,36 +21,30 @@ type Props = {
   canRemove: boolean;
 };
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
-async function readPhotosAsDataUrls(files: FileList | null): Promise<string[]> {
+async function readPhotosAsDataUrls(
+  files: FileList | null
+): Promise<{ urls: string[]; errors: string[] }> {
   if (!files?.length) {
-    return [];
+    return { urls: [], errors: [] };
   }
   const list = Array.from(files).slice(0, MAX_PHOTOS_PER_SHOE);
   const urls: string[] = [];
+  const errors: string[] = [];
   for (const file of list) {
     try {
-      urls.push(await compressImageFileToJpegDataUrl(file));
+      const { dataUrl } = await compressImageFile(file);
+      urls.push(dataUrl);
     } catch {
-      try {
-        urls.push(await readFileAsDataUrl(file));
-      } catch {}
+      errors.push(file.name);
     }
   }
-  return urls;
+  return { urls, errors };
 }
 
 export function ShoeLineFields({ index, value, onChange, onRemove, canRemove }: Props) {
   const inputId = `shoe-photos-${index}`;
   const [photoError, setPhotoError] = React.useState<string | null>(null);
+  const [compressing, setCompressing] = React.useState(false);
 
   return (
     <fieldset className="space-y-3 rounded-xl border bg-muted/30 p-4">
@@ -102,21 +96,32 @@ export function ShoeLineFields({ index, value, onChange, onRemove, canRemove }: 
         <Input
           id={inputId}
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/*"
+          capture="environment"
           multiple
+          disabled={compressing}
           className="cursor-pointer"
           onChange={async (e) => {
             setPhotoError(null);
+            setCompressing(true);
             try {
-              const urls = await readPhotosAsDataUrls(e.target.files);
-              if (!urls.length && e.target.files?.length) {
-                setPhotoError("Не удалось обработать снимки. Попробуйте JPEG/PNG или другое фото.");
+              const { urls, errors } = await readPhotosAsDataUrls(e.target.files);
+              if (urls.length) {
+                onChange({ ...value, photoUrls: urls });
               }
-              onChange({ ...value, photoUrls: urls });
+              if (errors.length) {
+                setPhotoError(
+                  `Не удалось сжать: ${errors.join(", ")}. Попробуйте другое фото (JPEG/PNG).`
+                );
+              } else if (!urls.length && e.target.files?.length) {
+                setPhotoError("Не удалось обработать снимки.");
+              }
             } catch {
               setPhotoError("Ошибка при чтении файлов.");
+            } finally {
+              setCompressing(false);
+              e.target.value = "";
             }
-            e.target.value = "";
           }}
         />
         {photoError ? (
@@ -154,11 +159,9 @@ export function ShoeLineFields({ index, value, onChange, onRemove, canRemove }: 
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Фото помогут не перепутать пару при выдаче.
-          </p>
-        )}
+        ) : compressing ? (
+          <p className="text-xs text-muted-foreground">Обработка фото…</p>
+        ) : null}
       </div>
       {canRemove ? (
         <div className="flex justify-end border-t pt-3">

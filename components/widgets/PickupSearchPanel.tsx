@@ -5,8 +5,8 @@ import Link from "next/link";
 
 import { OrderStatusBadge } from "@/components/widgets/OrderStatusBadge";
 import { Button } from "@/components/shared/button";
-import { Input } from "@/components/shared/input";
 import { Label } from "@/components/shared/label";
+import { PhoneInput } from "@/components/shared/phone-input";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/shared/card";
 import { formatPhoneDisplay } from "@/lib/crm/phone";
 import { useOrders } from "@/lib/crm/orders-context";
@@ -27,16 +27,12 @@ export function PickupSearchPanel() {
     <div className="mx-auto max-w-lg space-y-6">
       <div className="space-y-2">
         <Label htmlFor="pickup-phone">Телефон клиента</Label>
-        <Input
+        <PhoneInput
           id="pickup-phone"
-          type="tel"
-          inputMode="tel"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Номер из заказа"
-          autoComplete="tel"
+          onValueChange={setQuery}
+          placeholder="777-123-45-67"
         />
-        <p className="text-xs text-muted-foreground">Поиск по цифрам номера, можно частично.</p>
       </div>
 
       {query.trim() && results.length === 0 ? (
