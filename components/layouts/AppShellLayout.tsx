@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { SiteFooter } from "@/components/shared/site-footer";
 import { ThemeModeToggle } from "@/components/widgets/ThemeModeToggle";
 import { Button } from "@/components/shared/button";
 import { useOrders } from "@/lib/crm/orders-context";
@@ -73,6 +74,7 @@ export function AppShellLayout({ children }: { children: React.ReactNode }) {
           ) : null}
           {children}
         </main>
+        <SiteFooter />
       </div>
     </div>
   );

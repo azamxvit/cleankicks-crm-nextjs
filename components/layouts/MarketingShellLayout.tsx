@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { SiteFooter } from "@/components/shared/site-footer";
 import { ThemeModeToggle } from "@/components/widgets/ThemeModeToggle";
 import { Button } from "@/components/shared/button";
 
@@ -26,9 +27,7 @@ export function MarketingShellLayout({ children }: { children: React.ReactNode }
         </div>
       </header>
       {children}
-      <footer className="mt-auto border-t bg-muted/40 py-6 text-center text-xs text-muted-foreground">
-        Демо-режим: данные заказов хранятся в браузере (localStorage), без сервера.
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
